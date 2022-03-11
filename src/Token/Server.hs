@@ -15,6 +15,8 @@ import Data.Map.Strict (Map)
 import Data.Aeson
 import qualified Data.Map.Strict as Map
 import qualified Network.Wai.Handler.Warp as Warp
+import Data.Time (UTCTime)
+import qualified Data.Time as Time
 
 -------------------
 -- API Datatypes --
@@ -37,14 +39,14 @@ data GetTokenRequest = GetTokenRequest
 
 data GetTokenResponse = GetTokenResponse
   { token :: Text
-  -- , ttl :: UTCTime
+  , timestamp :: UTCTime
   }
   deriving stock (Show, Eq, Ord, Generic)
   deriving anyclass (ToJSON)
 
 startServer :: IO ()
 startServer = do
-  blueMessage "[+] Starting the Token issuer server on http://localhost:8900"
+  blueMessage "[+] Starting the Token dispenser on http://localhost:8900"
   let warpSettings = Warp.setPort 8900 Warp.defaultSettings
   Warp.runSettings warpSettings server
 
@@ -62,9 +64,15 @@ handleGetToken GetTokenRequest{email} =
   createToken email
   >>= \case
     Nothing -> throwError err403
-    Just tokenResponse -> pure tokenResponse
+    Just biscuit -> do
+      currentTimestamp <- liftIO Time.getCurrentTime
+      let timestamp = Time.addUTCTime 300 currentTimestamp
+      finalBiscuit <- liftIO $ addBlock [block| time(${timestamp}); |] biscuit
+      let token = decodeUtf8 $ serializeB64 finalBiscuit
+      let tokenResponse = GetTokenResponse token timestamp
+      pure tokenResponse
 
-createToken :: Text -> TokenM (Maybe GetTokenResponse)
+createToken :: Text -> TokenM (Maybe (Biscuit Open Verified))
 createToken "hr@example.org" = do
   biscuit <- liftIO $ mkBiscuit privateKey'
               [block| 
@@ -72,8 +80,7 @@ createToken "hr@example.org" = do
                   service("peopledoc");
                   right("read", "employees");
               |]
-  let token = decodeUtf8 $ serializeB64 biscuit
-  pure $ Just GetTokenResponse{..}
+  pure $ Just biscuit
 
 createToken "admin@example.org" = do
   biscuit <- liftIO $ mkBiscuit privateKey'
@@ -83,8 +90,7 @@ createToken "admin@example.org" = do
                 right("write", "user_group", "5dd98b37-01df-44ad-8a3b-2d86b58053b1");
                 service("api");
               |]
-  let token = decodeUtf8 $ serializeB64 biscuit
-  pure $ Just GetTokenResponse{..}
+  pure $ Just biscuit
 
 createToken "employee@example.org" = do
   biscuit <- liftIO $ mkBiscuit privateKey'
@@ -95,8 +101,7 @@ createToken "employee@example.org" = do
               right("read", "user_in_usergroup", "2d38f260-09a6-46ef-9d27-a4c6e2b21381", "5dd98b37-01df-44ad-8a3b-2d86b58053b1");
               right("write", "user_in_usergroup", "2d38f260-09a6-46ef-9d27-a4c6e2b21381", "5dd98b37-01df-44ad-8a3b-2d86b58053b1");
           |]
-  let token = decodeUtf8 $ serializeB64 biscuit
-  pure $ Just GetTokenResponse{..}
+  pure $ Just biscuit
 createToken _ =
   pure Nothing
 

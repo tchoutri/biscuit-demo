@@ -9,10 +9,11 @@ import Data.Text (Text)
 import Data.Maybe
 import Data.UUID (UUID)
 import Colourista.IO
-import Control.Monad.Reader (ReaderT, runReaderT)
+import Control.Monad.Reader (ReaderT, runReaderT, liftIO)
 import Data.Aeson
 import qualified Network.Wai.Handler.Warp as Warp
 import Data.Text.Display (Display(..), display, ShowInstance(..))
+import qualified Data.Time as Time
 
 -------------------
 -- API Datatypes --
@@ -71,7 +72,7 @@ data UserGroupInfo = UserGroupInfo
 
 startServer :: IO ()
 startServer = do
-  blueMessage "[+] Starting the API server server on http://localhost:8902"
+  blueMessage "[+] Starting the API server on http://localhost:8902"
   Warp.run 8902 apiApp
 
 apiApp :: Application
@@ -81,10 +82,17 @@ server :: Biscuit OpenOrSealed Verified -> ProtectedAPI (AsServerT Handler)
 server b = hoistServer @(NamedRoutes ProtectedAPI) Proxy (naturalTransform b) apiHandlers
 
 naturalTransform :: Biscuit OpenOrSealed Verified -> APIM a -> Handler a
-naturalTransform b app =
+naturalTransform b app = do
+  timestamp <- liftIO Time.getCurrentTime
   (\r -> runReaderT r ())
     . handleBiscuit b
-    . withPriorityAuthorizer [authorizer|check if service("api");|]
+    . withPriorityAuthorizer [authorizer|
+        check if
+          service("api");
+        check if
+          time($time),
+          $time <= ${timestamp};
+      |]
     $ app
 
 apiHandlers :: ProtectedAPI (AsServerT APIM)
