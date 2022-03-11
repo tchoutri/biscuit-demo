@@ -97,15 +97,15 @@ library
     , wai                  ^>=3.2
     , warp                 ^>=3.3
 
--- executable api-server
---   import:         common-extensions
---   import:         common-ghc-options
---   import:         common-rts-options
---   main-is:        Main.hs
---   hs-source-dirs: app/api-server
---   build-depends:
---     , base
---     , biscuit-demo
+executable api-server
+  import:         common-extensions
+  import:         common-ghc-options
+  import:         common-rts-options
+  main-is:        Main.hs
+  hs-source-dirs: app/api-server
+  build-depends:
+    , base
+    , biscuit-demo
 
 executable dispenser
   import:         common-extensions

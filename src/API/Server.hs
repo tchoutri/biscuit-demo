@@ -3,8 +3,8 @@ module API.Server where
 
 import Auth.Biscuit.Servant
 import Servant
+import Servant.Server.Internal
 import Servant.API.Generic
-import Servant.Server.Generic
 import Data.Text (Text)
 import Data.Maybe
 import Data.UUID (UUID)
@@ -13,9 +13,6 @@ import Control.Monad.Reader (ReaderT, runReaderT)
 import Data.Aeson
 import qualified Network.Wai.Handler.Warp as Warp
 import Data.Text.Display (Display(..), display, ShowInstance(..))
-import Servant.API.Generic
-import Servant.Server.Experimental.Auth (AuthHandler)
-import Servant.Client.Core (Request)
 
 -------------------
 -- API Datatypes --
@@ -23,7 +20,7 @@ import Servant.Client.Core (Request)
 
 type APIM = WithAuthorizer (ReaderT () Handler)
 
-type API mode = RequireBiscuit :> NamedRoutes ProtectedAPI
+type API = RequireBiscuit :> NamedRoutes ProtectedAPI
 
 data ProtectedAPI mode = ProtectedAPI
   { showGroup :: mode :- "user_groups"
@@ -74,27 +71,21 @@ data UserGroupInfo = UserGroupInfo
 
 startServer :: IO ()
 startServer = do
-  blueMessage "[+] Starting the Token issuer server on localhost:8900"
-  Warp.run 9802 apiApp
+  blueMessage "[+] Starting the API server server on http://localhost:8902"
+  Warp.run 8902 apiApp
 
 apiApp :: Application
-apiApp = serveWithContext p (genBiscuitCtx publicKey') apiServer
-  where
-    p = genericApi (Proxy :: Proxy APIM)
+apiApp = serveWithContext @API Proxy (genBiscuitCtx publicKey') server
 
-apiServer :: Biscuit OpenOrSealed Verified -> Server api
-apiServer biscuit = genericServeT $ 
-  hoistServerWithContext p pctx (naturalTransform biscuit) (genericServeT apiHandlers) 
-    where
-      p = genericApi (Proxy :: Proxy APIM)
-      pctx = Proxy :: Proxy (Context '[AuthHandler Request (Biscuit OpenOrSealed Verified)])
+server :: Biscuit OpenOrSealed Verified -> ProtectedAPI (AsServerT Handler)
+server b = hoistServer @(NamedRoutes ProtectedAPI) Proxy (naturalTransform b) apiHandlers
 
 naturalTransform :: Biscuit OpenOrSealed Verified -> APIM a -> Handler a
-naturalTransform b app = 
+naturalTransform b app =
   (\r -> runReaderT r ())
-    $ handleBiscuit b
-    $ withPriorityAuthorizer [authorizer|allow if service("api");|]
-    app
+    . handleBiscuit b
+    . withPriorityAuthorizer [authorizer|allow if service("api");|]
+    $ app
 
 apiHandlers :: ProtectedAPI (AsServerT APIM)
 apiHandlers = ProtectedAPI
@@ -103,7 +94,7 @@ apiHandlers = ProtectedAPI
   }
 
 showUserHandler :: UserGroupId -> UserId -> APIM UserInfo
-showUserHandler userGroupId userId = 
+showUserHandler userGroupId userId =
   withAuthorizer [authorizer| allow if right("read", "user_in_usergroup", ${userGroupId}, ${userId}); |] $ do
     pure $ UserInfo{userId = userId, name = "Bertrand PLASTIC"}
 

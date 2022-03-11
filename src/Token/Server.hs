@@ -79,10 +79,9 @@ createToken "admin@example.org" = do
   biscuit <- liftIO $ mkBiscuit privateKey'
               [block|
                 user_id("ab53e7eb-7ff2-438d-b4db-0cd1013d9a68");
-                check if
-                  service("api");
-                  right("read", "user_group", "5dd98b37-01df-44ad-8a3b-2d86b58053b1");
-                  right("write", "user_group", "5dd98b37-01df-44ad-8a3b-2d86b58053b1");
+                right("read", "user_group", "5dd98b37-01df-44ad-8a3b-2d86b58053b1");
+                right("write", "user_group", "5dd98b37-01df-44ad-8a3b-2d86b58053b1");
+                service("api");
               |]
   let token = decodeUtf8 $ serializeB64 biscuit
   pure $ Just GetTokenResponse{..}
