@@ -84,7 +84,7 @@ naturalTransform :: Biscuit OpenOrSealed Verified -> APIM a -> Handler a
 naturalTransform b app =
   (\r -> runReaderT r ())
     . handleBiscuit b
-    . withPriorityAuthorizer [authorizer|allow if service("api");|]
+    . withPriorityAuthorizer [authorizer|check if service("api");|]
     $ app
 
 apiHandlers :: ProtectedAPI (AsServerT APIM)

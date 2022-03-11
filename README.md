@@ -60,3 +60,25 @@ Transfer-Encoding: chunked
 ```
 
 We can see that the biscuit was validated and the checks have passed.
+
+Now, what if someone from HR tries to access a UserGroup?
+
+After retrieving a token from the dispenser with the email "hr@example.org", we try and query the API server:
+
+```bash
+http GET "http://localhost:8902/user_groups/5dd98b37-01df-44ad-8a3b-2d86b58053b1" "Authorization:Bearer $hr_biscuit"HTTP/1.1 401 Unauthorized
+Date: Fri, 11 Mar 2022 10:23:46 GMT
+Server: Warp/3.3.20
+Transfer-Encoding: chunked
+
+Biscuit failed checks
+```
+
+And in the server logs:
+
+```haskell
+ResultError (NoPoliciesMatched [[QueryItem {qBody = [Predicate {name = "service", terms = [LString "peopledoc"]}], qExpressions = []}],[QueryItem {qBody = [Predicate {name = "service", terms = [LString "api"]}], qExpressions = []}]])
+```
+
+This is a bit rough to read, but look for the "service" strings in this message. The first one is "peopledoc", which is the value of the `service()` fact
+in the HR token. The other one is "api", which is the value expected by the API server. They do not match, and as such, the verification fails.
