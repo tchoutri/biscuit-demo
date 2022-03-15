@@ -76,9 +76,8 @@ createToken :: Text -> TokenM (Maybe (Biscuit Open Verified))
 createToken "hr@example.org" = do
   biscuit <- liftIO $ mkBiscuit privateKey'
               [block| 
-                check if
-                  service("peopledoc");
-                  right("read", "employees");
+                service("peopledoc");
+                right("read", "employees");
               |]
   pure $ Just biscuit
 
@@ -96,10 +95,9 @@ createToken "employee@example.org" = do
   biscuit <- liftIO $ mkBiscuit privateKey'
           [block| 
             user_id("2d38f260-09a6-46ef-9d27-a4c6e2b21381");
-            check if
-              service("api");
-              right("read", "user_in_usergroup", "2d38f260-09a6-46ef-9d27-a4c6e2b21381", "5dd98b37-01df-44ad-8a3b-2d86b58053b1");
-              right("write", "user_in_usergroup", "2d38f260-09a6-46ef-9d27-a4c6e2b21381", "5dd98b37-01df-44ad-8a3b-2d86b58053b1");
+            service("api");
+            right("read", "user_in_usergroup", "2d38f260-09a6-46ef-9d27-a4c6e2b21381", "5dd98b37-01df-44ad-8a3b-2d86b58053b1");
+            right("write", "user_in_usergroup", "2d38f260-09a6-46ef-9d27-a4c6e2b21381", "5dd98b37-01df-44ad-8a3b-2d86b58053b1");
           |]
   pure $ Just biscuit
 createToken _ =
