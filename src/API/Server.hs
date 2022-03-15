@@ -10,6 +10,8 @@ import Colourista.IO
 import Control.Monad.Reader (ReaderT, runReaderT, liftIO)
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Data.Time as Time
+import Network.Wai.Middleware.Cors
+-- import Network.Wai.Middleware.RequestLogger 
 
 import Types
 
@@ -36,7 +38,13 @@ data ProtectedAPI mode = ProtectedAPI
 startServer :: IO ()
 startServer = do
   blueMessage "[+] Starting the API server on http://localhost:8902"
-  Warp.run 8902 apiApp
+  Warp.run 8902 $
+    cors (const $ Just policy) apiApp
+      where
+        policy = simpleCorsResourcePolicy
+          { corsRequestHeaders = ["Content-Type", "Authorization"]
+          , corsOrigins = Nothing
+          }
 
 apiApp :: Application
 apiApp = serveWithContext @API Proxy (genBiscuitCtx publicKey') server
@@ -55,6 +63,7 @@ naturalTransform b app = do
         time(${timestamp});
       |]
     $ app
+    
 
 apiHandlers :: ProtectedAPI (AsServerT APIM)
 apiHandlers = ProtectedAPI

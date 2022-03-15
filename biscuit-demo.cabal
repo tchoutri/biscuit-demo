@@ -95,6 +95,8 @@ library
     , vector               ^>=0.12
     , wai                  ^>=3.2
     , warp                 ^>=3.3
+    , wai-cors
+    , wai-extra
 
 executable api-server
   import:         common-extensions

@@ -15,6 +15,8 @@ import qualified Data.Map.Strict as Map
 import Data.Aeson
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Data.Time as Time
+import Network.Wai.Middleware.Cors 
+import Network.Wai.Middleware.RequestLogger (logStdoutDev)
 
 import Types
 
@@ -50,8 +52,13 @@ startServer = do
   Warp.runSettings warpSettings server
 
 server :: Application
-server =
+server = cors (const $ Just policy) $ logStdoutDev $
   genericServeT (`runReaderT` ()) tokenServer
+    where
+      policy = simpleCorsResourcePolicy
+        { corsRequestHeaders = ["Content-Type"]
+        , corsOrigins = Just (["http://localhost:8000"], True) 
+        }
 
 tokenServer :: TokenAPI (AsServerT TokenM)
 tokenServer = TokenAPI

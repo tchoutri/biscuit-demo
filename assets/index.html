@@ -1,0 +1,89 @@
+<!DOCTYPE HTML>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Biscuit demo</title>
+    <link href="https://unpkg.com/tailwindcss@^1.0/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https:////unpkg.com/alpinejs" defer></script>
+  </head>
+
+  <body class="p-10">
+      <h4 class="font-bold text-lg w-64 mx-auto">Biscuit demo</h4>
+          <div class="mt-4">
+            <form class="w-64 mx-auto" x-data="authForm()" @submit.prevent="submitData">
+              <div class="mb-4">
+                <label class="block mb-2"> Email: </label>
+                <input type="email" name="email" class="border w-full p-1" x-model="formData.email">
+              </div>
+              <button class="bg-gray-700 hover:bg-gray-800 text-white w-full p-2">Submit</button>
+
+              <p x-text="message0"></p>
+              <p x-text="message1"></p>
+              <p x-text="message2"></p>
+            </form>
+          </div>
+
+          <hr>
+
+    <script>
+      document.addEventListener('alpine:init', () => {
+          Alpine.data('groupForm', () => ({
+              open: false,
+
+              toggle() {
+                  this.open = ! this.open
+              },
+          }))
+      });
+
+      const authForm = () => {
+        return {
+          formData: {
+            email: ""
+          },
+          token: "",
+          message0: "",
+          message1: "",
+          message2: "",
+
+          submitData(){
+            fetch("http://localhost:8900/tokens", {
+              method: "POST",
+              headers: {"Content-Type": "application/json"},
+              body: JSON.stringify(this.formData)
+            })
+            .then(response => {
+              this.message0 = "Authenticated!";
+              return response.json();
+            })
+            .then(json => {
+              this.message1 = "Querying the API server…";
+              return json.token;
+            })
+            .then(token => {
+              return fetch("http://localhost:8902/user_groups/5dd98b37-01df-44ad-8a3b-2d86b58053b1", {
+                method: "GET",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${token}`,
+                },
+              })
+            })
+            .then(groupInfo => {
+              console.log(groupInfo);
+              return groupInfo.json();
+            })
+            .then(json => {
+              return this.message2 = `Group name is: ${json.name}`;
+            })
+            .catch(bleh => {
+              this.message = "Something went wrong";
+              console.log(bleh);
+			})
+          }
+        }
+      }
+    </script>
+  </body>
+</html>
