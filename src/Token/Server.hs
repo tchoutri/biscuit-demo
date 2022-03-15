@@ -8,15 +8,15 @@ import Servant.Server.Generic
 import Data.Text (Text)
 import Data.Text.Encoding
 import Data.Maybe
-import Data.UUID (UUID)
 import Colourista.IO
 import Control.Monad.Reader
 import Data.Map.Strict (Map)
-import Data.Aeson
 import qualified Data.Map.Strict as Map
+import Data.Aeson
 import qualified Network.Wai.Handler.Warp as Warp
-import Data.Time (UTCTime)
 import qualified Data.Time as Time
+
+import Types
 
 -------------------
 -- API Datatypes --
@@ -39,7 +39,6 @@ data GetTokenRequest = GetTokenRequest
 
 data GetTokenResponse = GetTokenResponse
   { token :: Text
-  , timestamp :: UTCTime
   }
   deriving stock (Show, Eq, Ord, Generic)
   deriving anyclass (ToJSON)
@@ -65,43 +64,26 @@ handleGetToken GetTokenRequest{email} =
   >>= \case
     Nothing -> throwError err403
     Just biscuit -> do
-      currentTimestamp <- liftIO Time.getCurrentTime
-      let timestamp = Time.addUTCTime 300 currentTimestamp
-      finalBiscuit <- liftIO $ addBlock [block| time(${timestamp}); |] biscuit
-      let token = decodeUtf8 $ serializeB64 finalBiscuit
-      let tokenResponse = GetTokenResponse token timestamp
+      let token = decodeUtf8 $ serializeB64 biscuit
+      let tokenResponse = GetTokenResponse token
       pure tokenResponse
 
 createToken :: Text -> TokenM (Maybe (Biscuit Open Verified))
-createToken "hr@example.org" = do
-  biscuit <- liftIO $ mkBiscuit privateKey'
-              [block| 
-                service("peopledoc");
-                right("read", "employees");
-              |]
-  pure $ Just biscuit
-
-createToken "admin@example.org" = do
-  biscuit <- liftIO $ mkBiscuit privateKey'
-              [block|
-                user_id("ab53e7eb-7ff2-438d-b4db-0cd1013d9a68");
-                right("read", "user_group", "5dd98b37-01df-44ad-8a3b-2d86b58053b1");
-                right("write", "user_group", "5dd98b37-01df-44ad-8a3b-2d86b58053b1");
-                service("api");
-              |]
-  pure $ Just biscuit
-
-createToken "employee@example.org" = do
-  biscuit <- liftIO $ mkBiscuit privateKey'
-          [block| 
-            user_id("2d38f260-09a6-46ef-9d27-a4c6e2b21381");
-            service("api");
-            right("read", "user_in_usergroup", "2d38f260-09a6-46ef-9d27-a4c6e2b21381", "5dd98b37-01df-44ad-8a3b-2d86b58053b1");
-            right("write", "user_in_usergroup", "2d38f260-09a6-46ef-9d27-a4c6e2b21381", "5dd98b37-01df-44ad-8a3b-2d86b58053b1");
-          |]
-  pure $ Just biscuit
-createToken _ =
-  pure Nothing
+createToken email =
+  case Map.lookup email permissions of
+    Nothing -> pure Nothing
+    Just perms -> do
+      case Map.lookup email users of
+        Nothing -> pure Nothing
+        Just userId -> do
+          currentTimestamp <- liftIO Time.getCurrentTime
+          let timestamp = Time.addUTCTime 300 currentTimestamp
+          let timestampBlock = [block| ttl(${timestamp}); |]
+          let serviceBlock = [block| service("api"); |]
+          let permissionsBlock = mconcat $ fmap permissionToBlock perms
+          let biscuitBlock = permissionsBlock <> [block| user_id(${userId}); |] <> timestampBlock <> serviceBlock
+          biscuit <- liftIO $ mkBiscuit privateKey' biscuitBlock
+          pure $ Just biscuit
 
 data Permission = Permission Action Resource
   deriving stock (Show, Eq, Ord, Generic)
@@ -109,39 +91,46 @@ data Permission = Permission Action Resource
 data Action = Read | Write
   deriving stock (Show, Eq, Ord, Generic)
 
-newtype UserGroupId = UserGroupId UUID
-  deriving stock (Show, Eq, Ord, Generic)
-
-newtype UserId = UserId UUID
-  deriving stock (Show, Eq, Ord, Generic)
-
 data Resource = UserGroup UserGroupId
               | UserInUserGroup UserId UserGroupId
-              | EmployeeFile UUID
+              | EmployeeFile UserId
   deriving stock (Show, Eq, Ord, Generic)
 
 -- | We can translate those into blocks but it is instead done manually in the quasi-quoter
-permissions :: Map UserId [Permission]
+permissions :: Map Text [Permission]
 permissions = Map.fromList
-  [ (user1, [ Permission Read (UserInUserGroup user1 user1UserGroup)
-            , Permission Write (UserInUserGroup user1 user1UserGroup)
-            ])
-  , (admin1, [ Permission Write (UserGroup user1UserGroup)
-             ])
+  [ ("employee@example.org", [ Permission Read (UserInUserGroup employee1 employee1UserGroup)
+                             , Permission Write (UserInUserGroup employee1 employee1UserGroup)
+                             ])
+  , ("admin@example.org", [ Permission Write (UserGroup employee1UserGroup)
+                          , Permission Read (UserGroup employee1UserGroup)
+                          , Permission Read (UserInUserGroup employee1 employee1UserGroup)
+                          , Permission Write (UserInUserGroup employee1 employee1UserGroup)
+                          ])
   ]
 
-user1 :: UserId
-user1 = UserId $ read "2d38f260-09a6-46ef-9d27-a4c6e2b21381"
+users :: Map Text UserId
+users = Map.fromList
+  [ ("employee@example.org", UserId $ read "2d38f260-09a6-46ef-9d27-a4c6e2b21381")
+  , ("admin@example.org", UserId $ read "ab53e7eb-7ff2-438d-b4db-0cd1013d9a68")
+  ]
 
-user1UserGroup :: UserGroupId
-user1UserGroup = UserGroupId $ read "5dd98b37-01df-44ad-8a3b-2d86b58053b1"
+permissionToBlock :: Permission -> Block
+permissionToBlock (Permission Read (UserInUserGroup userId userGroupId)) = [block| right("read", "user_in_usergroup", ${userId}, ${userGroupId}); |]
+permissionToBlock (Permission Write (UserInUserGroup userId userGroupId)) = [block| right("write", "user_in_usergroup", ${userId}, ${userGroupId}); |]
+permissionToBlock (Permission Read (UserGroup userGroupId)) = [block| right("read", "user_group", ${userGroupId}); |]
+permissionToBlock (Permission Write (UserGroup userGroupId)) = [block| right("write", "user_group", ${userGroupId}); |]
+permissionToBlock (Permission Write (EmployeeFile employeeFileId)) = [block| right("write", "employee_file", ${employeeFileId}); |]
+permissionToBlock (Permission Read (EmployeeFile employeeFileId)) = [block| right("read", "employee_file", ${employeeFileId}); |]
+
+employee1UserGroup :: UserGroupId
+employee1UserGroup = UserGroupId $ read "5dd98b37-01df-44ad-8a3b-2d86b58053b1"
 
 admin1 :: UserId
 admin1 = UserId $ read "ab53e7eb-7ff2-438d-b4db-0cd1013d9a68"
 
-employee1 :: UUID
-employee1 = read "1e1d62d8-a508-4d75-846b-fd5c646d6daf"
-
+employee1 :: UserId
+employee1 = UserId $ read "1e1d62d8-a508-4d75-846b-fd5c646d6daf"
 
 privateKey' :: SecretKey
 privateKey' = fromMaybe (error "Error parsing private key") $ parseSecretKeyHex "48e9c8b68441134b7f6e10b67df968f5a0837560d625948b2cbd5d80ffed092e"

@@ -5,15 +5,13 @@ import Auth.Biscuit.Servant
 import Servant
 import Servant.Server.Internal
 import Servant.API.Generic
-import Data.Text (Text)
 import Data.Maybe
-import Data.UUID (UUID)
 import Colourista.IO
 import Control.Monad.Reader (ReaderT, runReaderT, liftIO)
-import Data.Aeson
 import qualified Network.Wai.Handler.Warp as Warp
-import Data.Text.Display (Display(..), display, ShowInstance(..))
 import qualified Data.Time as Time
+
+import Types
 
 -------------------
 -- API Datatypes --
@@ -35,41 +33,6 @@ data ProtectedAPI mode = ProtectedAPI
   }
   deriving stock Generic
 
-newtype UserGroupId = UserGroupId UUID
-  deriving stock (Eq, Ord, Generic)
-  deriving (Show, FromHttpApiData, ToJSON)
-    via UUID
-  deriving Display
-    via ShowInstance UserGroupId
-
-instance ToTerm UserGroupId where
-  toTerm = LString . display
-
-
-newtype UserId = UserId UUID
-  deriving stock (Eq, Ord, Generic)
-  deriving (Show, FromHttpApiData, ToJSON)
-    via UUID
-  deriving Display
-    via ShowInstance UserId
-
-instance ToTerm UserId where
-  toTerm = LString . display
-
-data UserInfo = UserInfo
-  { userId :: UserId
-  , name :: Text
-  }
-  deriving stock (Show, Eq, Ord, Generic)
-  deriving anyclass (ToJSON)
-
-data UserGroupInfo = UserGroupInfo
-  { userGroupId :: UserGroupId
-  , name :: Text
-  }
-  deriving stock (Show, Eq, Ord, Generic)
-  deriving anyclass (ToJSON)
-
 startServer :: IO ()
 startServer = do
   blueMessage "[+] Starting the API server on http://localhost:8902"
@@ -90,8 +53,8 @@ naturalTransform b app = do
         check if
           service("api");
         check if
-          time($time),
-          $time <= ${timestamp};
+          ttl($time),
+          $time >= ${timestamp};
       |]
     $ app
 
@@ -103,7 +66,7 @@ apiHandlers = ProtectedAPI
 
 showUserHandler :: UserGroupId -> UserId -> APIM UserInfo
 showUserHandler userGroupId userId =
-  withAuthorizer [authorizer| allow if right("read", "user_in_usergroup", ${userGroupId}, ${userId}); |] $ do
+  withAuthorizer [authorizer| allow if right("read", "user_in_usergroup", ${userId}, ${userGroupId}); |] $ do
     pure $ UserInfo{userId = userId, name = "Bertrand PLASTIC"}
 
 showGroupHandler :: UserGroupId -> APIM UserGroupInfo

@@ -69,6 +69,7 @@ library
   exposed-modules:
     API.Server
     Token.Server
+    Types
 
   build-depends:
     , aeson                <=1.6
