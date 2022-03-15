@@ -78,11 +78,12 @@ createToken email =
         Just userId -> do
           currentTimestamp <- liftIO Time.getCurrentTime
           let timestamp = Time.addUTCTime 300 currentTimestamp
-          let timestampBlock = [block| ttl(${timestamp}); |]
-          let serviceBlock = [block| service("api"); |]
-          let permissionsBlock = mconcat $ fmap permissionToBlock perms
-          let biscuitBlock = permissionsBlock <> [block| user_id(${userId}); |] <> timestampBlock <> serviceBlock
-          biscuit <- liftIO $ mkBiscuit privateKey' biscuitBlock
+          let authority = [block|
+            service("api");
+            user_id(${userId});
+            check if time($t), $t < ${timestamp};
+            |]<> foldMap permissionToBlock perms
+          biscuit <- liftIO $ mkBiscuit privateKey' authority
           pure $ Just biscuit
 
 data Permission = Permission Action Resource

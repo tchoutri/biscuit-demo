@@ -52,9 +52,7 @@ naturalTransform b app = do
     . withPriorityAuthorizer [authorizer|
         check if
           service("api");
-        check if
-          ttl($time),
-          $time >= ${timestamp};
+        time(${timestamp});
       |]
     $ app
 
