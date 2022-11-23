@@ -82,7 +82,6 @@ library
     , http-api-data        ^>=0.4
     , http-types           ^>=0.12
     , mtl                  ^>=2.2
-    , optics-core          ^>=0.4
     , servant              ^>=0.19
     , servant-client       ^>=0.19
     , servant-client-core  ^>=0.19
