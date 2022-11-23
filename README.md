@@ -66,7 +66,8 @@ Now, what if someone from HR tries to access a UserGroup?
 After retrieving a token from the dispenser with the email "hr@example.org", we try and query the API server:
 
 ```bash
-http GET "http://localhost:8902/user_groups/5dd98b37-01df-44ad-8a3b-2d86b58053b1" "Authorization:Bearer $hr_biscuit"HTTP/1.1 401 Unauthorized
+http GET "http://localhost:8902/user_groups/5dd98b37-01df-44ad-8a3b-2d86b58053b1" "Authorization:Bearer $hr_biscuit"
+HTTP/1.1 401 Unauthorized
 Date: Fri, 11 Mar 2022 10:23:46 GMT
 Server: Warp/3.3.20
 Transfer-Encoding: chunked
