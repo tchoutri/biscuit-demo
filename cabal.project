@@ -1,6 +1,6 @@
 packages: ./
 
-with-compiler: ghc-8.10.7
+with-compiler: ghc-9.14.1
 
 jobs: 8
 
@@ -11,3 +11,5 @@ tests: True
 allow-newer: all
 
 test-show-details: direct
+
+index-state: 2026-10-02T12:33:06Z
